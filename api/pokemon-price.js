@@ -8,10 +8,23 @@ export default async function handler(req, res) {
   }
 
   try {
-    const url = `https://api.pokemontcg.io/v2/cards?q=name:"${encodeURIComponent(name)}"&pageSize=5`
-    const response = await fetch(url)
+    const exactUrl = `https://api.pokemontcg.io/v2/cards?q=name:"${encodeURIComponent(name)}"&pageSize=5`
+    let response = await fetch(exactUrl)
     if (!response.ok) throw new Error('Upstream request failed')
-    const data = await response.json()
+    let data = await response.json()
+
+    // Exact phrase match failed (e.g. name formatted differently, like "Mega
+    // Charizard EX" vs the card's real name "M Charizard-EX") — fall back to
+    // a wildcard match on each word of the name.
+    if (!data.data?.length) {
+      const words = name.split(/\s+/).filter((w) => w.length > 1)
+      if (words.length) {
+        const wildcardQuery = words.map((w) => `name:*${encodeURIComponent(w)}*`).join(' ')
+        const fallbackUrl = `https://api.pokemontcg.io/v2/cards?q=${wildcardQuery}&pageSize=5`
+        response = await fetch(fallbackUrl)
+        if (response.ok) data = await response.json()
+      }
+    }
 
     const results = (data.data || []).map((card) => {
       const tcgMarket = Object.values(card.tcgplayer?.prices || {}).find((p) => p.market)?.market
