@@ -505,6 +505,8 @@ export default function App() {
   const [livePrices, setLivePrices] = useState({})
   const [loading, setLoading] = useState(true)
   const [matchedFirst, setMatchedFirst] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -586,9 +588,13 @@ export default function App() {
     return sum + Number(price || 0)
   }, 0)
 
-  const displayCards = matchedFirst
+  const sortedCards = matchedFirst
     ? [...cards].sort((a, b) => (b.pokemon_card_id ? 1 : 0) - (a.pokemon_card_id ? 1 : 0))
     : cards
+
+  const pageCount = Math.max(1, Math.ceil(sortedCards.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const displayCards = sortedCards.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   return (
     <div className="app-root">
@@ -611,14 +617,29 @@ export default function App() {
         <section className="card-grid-section">
           <div className="collection-header">
             <h2>Your Collection ({cards.length})</h2>
-            <label className="matched-first-toggle">
-              <input
-                type="checkbox"
-                checked={matchedFirst}
-                onChange={(e) => setMatchedFirst(e.target.checked)}
-              />
-              Matched cards first
-            </label>
+            <div className="collection-controls">
+              <label className="matched-first-toggle">
+                <input
+                  type="checkbox"
+                  checked={matchedFirst}
+                  onChange={(e) => setMatchedFirst(e.target.checked)}
+                />
+                Matched cards first
+              </label>
+              <label className="page-size-select">
+                Per page:
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value))
+                    setPage(1)
+                  }}
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </label>
+            </div>
           </div>
           {loading && <p className="hint-text">Loading…</p>}
           {!loading && cards.length === 0 && (
@@ -634,6 +655,45 @@ export default function App() {
                 onUpdated={handleCardUpdated}
               />
             ))}
+          </div>
+          {pageCount > 1 && (
+            <div className="pagination">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Prev
+              </button>
+              <span className="hint-text">
+                Page {currentPage} of {pageCount}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                disabled={currentPage === pageCount}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </section>
+
+        <section className="game-section">
+          <h2>🎮 Shadow Takedown — Play Now</h2>
+          <p className="hint-text">
+            A stealth game I built — 20 levels, kill-cams, weapon unlocks.{' '}
+            <a href="https://shadow-takedown.vercel.app" target="_blank" rel="noreferrer">
+              Play fullscreen ↗
+            </a>
+          </p>
+          <div className="game-embed-wrap">
+            <iframe
+              src="https://shadow-takedown.vercel.app"
+              title="Shadow Takedown"
+              allow="fullscreen; gamepad"
+              allowFullScreen
+            />
           </div>
         </section>
       </main>
