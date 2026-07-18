@@ -137,6 +137,57 @@ body {
   padding: 20px;
 }
 
+.sponsor-row {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sponsor-banner {
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #1c1530;
+  border: 1px solid #3d2f5c;
+  border-radius: 10px;
+  padding: 14px 20px;
+  text-decoration: none;
+  color: #ecdff5;
+}
+
+.sponsor-banner:hover {
+  border-color: #8552c4;
+}
+
+.sponsor-banner img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.sponsor-banner .promo-label {
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #9a8bb0;
+}
+
+.sponsor-banner h3 {
+  margin: 2px 0;
+  font-size: 15px;
+  color: #e8c65a;
+}
+
+.sponsor-banner p {
+  margin: 0;
+  font-size: 13px;
+  color: #b7a4d1;
+}
+
 .game-section h2 {
   margin: 0 0 6px;
   font-size: 16px;
