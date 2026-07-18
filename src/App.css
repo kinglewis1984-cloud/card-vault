@@ -111,6 +111,10 @@ body {
   color: #b7a4d1;
 }
 
+.matched-value {
+  color: #7fd99a;
+}
+
 .signout-btn {
   background: transparent;
   border: 1px solid #6b3fa0;

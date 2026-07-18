@@ -506,6 +506,12 @@ export default function App() {
     return sum + Number(price || 0)
   }, 0)
 
+  const matchedValue = cards.reduce((sum, card) => {
+    if (!card.pokemon_card_id) return sum
+    const price = livePrices[card.id] ?? card.purchase_price ?? 0
+    return sum + Number(price || 0)
+  }, 0)
+
   const displayCards = matchedFirst
     ? [...cards].sort((a, b) => (b.pokemon_card_id ? 1 : 0) - (a.pokemon_card_id ? 1 : 0))
     : cards
@@ -515,7 +521,10 @@ export default function App() {
       <header className="site-header">
         <div>
           <h1>CARD VAULT</h1>
-          <p className="tagline">Total portfolio value: £{totalValue.toFixed(2)}</p>
+          <p className="tagline">
+            Total portfolio value: £{totalValue.toFixed(2)}
+            <span className="matched-value"> · Matched portfolio value: £{matchedValue.toFixed(2)}</span>
+          </p>
         </div>
         <button className="signout-btn" onClick={() => supabase.auth.signOut()}>
           Sign out
