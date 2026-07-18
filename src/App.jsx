@@ -2,6 +2,19 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import './App.css'
 
+function variantLabel(key) {
+  return key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase())
+}
+
+// Opens an image full-size in a new tab so it can be checked against the
+// physical card. stopPropagation matters where the image sits inside a
+// clickable button/tile (e.g. a match result) so zooming doesn't also
+// trigger that button's own click action.
+function openImage(e, url) {
+  e.stopPropagation()
+  window.open(url, '_blank', 'noopener')
+}
+
 function AuthGate() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
@@ -46,6 +59,116 @@ function AuthGate() {
   )
 }
 
+// Search + pick UI shared between adding a new card and re-matching an
+// existing one. Parent owns name/selectedCard/selectedVariant so both flows
+// can persist them however they need (insert vs. update).
+function PokemonMatchPicker({ name, onNameChange, selectedCard, selectedVariant, onSelect, onClear }) {
+  const [searching, setSearching] = useState(false)
+  const [matches, setMatches] = useState([])
+
+  async function search() {
+    if (!name.trim()) return
+    setSearching(true)
+    onClear()
+    setMatches([])
+    try {
+      const r = await fetch(`/api/pokemon-price?name=${encodeURIComponent(name.trim())}`)
+      const data = await r.json()
+      setMatches(data.results || [])
+    } catch {
+      setMatches([])
+    }
+    setSearching(false)
+  }
+
+  function pick(card) {
+    onSelect(card, card.variants[0]?.key || '')
+    setMatches([])
+  }
+
+  return (
+    <>
+      <div className="name-search-row">
+        <input
+          type="text"
+          placeholder="Card name (e.g. Charizard, Tonali auto)"
+          value={name}
+          onChange={(e) => {
+            onNameChange(e.target.value)
+            if (selectedCard) onClear()
+          }}
+          required
+        />
+        <button type="button" onClick={search} disabled={searching || !name.trim()}>
+          {searching ? '…' : 'Find'}
+        </button>
+      </div>
+
+      {matches.length > 0 && (
+        <div className="match-list">
+          {matches.map((m) => (
+            <button type="button" key={m.id} className="match-item" onClick={() => pick(m)}>
+              {m.image && (
+                <img
+                  className="zoomable"
+                  src={m.image}
+                  alt={m.name}
+                  onClick={(e) => openImage(e, m.image)}
+                />
+              )}
+              <span>
+                <strong>{m.name}</strong>
+                <span className="hint-text">
+                  {m.set} #{m.number}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {!searching && matches.length === 0 && name && !selectedCard && (
+        <p className="hint-text">Click "Find" to match this to a real card and its print/variant.</p>
+      )}
+
+      {selectedCard && (
+        <div className="selected-card">
+          {selectedCard.image && (
+            <img
+              className="zoomable"
+              src={selectedCard.image}
+              alt={selectedCard.name}
+              onClick={(e) => openImage(e, selectedCard.image)}
+            />
+          )}
+          <div className="selected-card-body">
+            <strong>{selectedCard.name}</strong>
+            <span className="hint-text">
+              {selectedCard.set} #{selectedCard.number}
+            </span>
+            {selectedCard.variants.length > 0 ? (
+              <select
+                value={selectedVariant}
+                onChange={(e) => onSelect(selectedCard, e.target.value)}
+              >
+                {selectedCard.variants.map((v) => (
+                  <option key={v.key} value={v.key}>
+                    {v.label} — £{v.price.toFixed(2)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="hint-text">No print/variant breakdown available</span>
+            )}
+            <button type="button" className="change-match-btn" onClick={onClear}>
+              Change
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 function AddCardForm({ userId, onAdded }) {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('pokemon')
@@ -53,6 +176,20 @@ function AddCardForm({ userId, onAdded }) {
   const [purchaseDate, setPurchaseDate] = useState('')
   const [imageFile, setImageFile] = useState(null)
   const [saving, setSaving] = useState(false)
+
+  const [selectedCard, setSelectedCard] = useState(null)
+  const [selectedVariant, setSelectedVariant] = useState('')
+
+  function handleSelect(card, variant) {
+    setSelectedCard(card)
+    setSelectedVariant(variant)
+    setName(card.name)
+  }
+
+  function clearSelection() {
+    setSelectedCard(null)
+    setSelectedVariant('')
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -78,6 +215,8 @@ function AddCardForm({ userId, onAdded }) {
       image_url: imageUrl,
       purchase_price: purchasePrice ? Number(purchasePrice) : null,
       purchase_date: purchaseDate || null,
+      pokemon_card_id: category === 'pokemon' ? selectedCard?.id ?? null : null,
+      pokemon_variant: category === 'pokemon' ? selectedVariant || null : null,
     })
 
     setSaving(false)
@@ -86,6 +225,8 @@ function AddCardForm({ userId, onAdded }) {
       setPurchasePrice('')
       setPurchaseDate('')
       setImageFile(null)
+      setMatches([])
+      clearSelection()
       onAdded()
     }
   }
@@ -93,14 +234,32 @@ function AddCardForm({ userId, onAdded }) {
   return (
     <form className="add-card-form" onSubmit={handleSubmit}>
       <h2>Add a Card</h2>
-      <input
-        type="text"
-        placeholder="Card name (e.g. Charizard, Tonali auto)"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-      />
-      <select value={category} onChange={(e) => setCategory(e.target.value)}>
+      {category === 'pokemon' ? (
+        <PokemonMatchPicker
+          name={name}
+          onNameChange={setName}
+          selectedCard={selectedCard}
+          selectedVariant={selectedVariant}
+          onSelect={handleSelect}
+          onClear={clearSelection}
+        />
+      ) : (
+        <input
+          type="text"
+          placeholder="Card name (e.g. Tonali auto)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+      )}
+
+      <select
+        value={category}
+        onChange={(e) => {
+          setCategory(e.target.value)
+          clearSelection()
+        }}
+      >
         <option value="pokemon">Pokemon</option>
         <option value="football">Football</option>
       </select>
@@ -128,7 +287,80 @@ function AddCardForm({ userId, onAdded }) {
   )
 }
 
-function CardTile({ card, livePrice, onDelete }) {
+function EditCardForm({ card, onSaved, onCancel }) {
+  const [name, setName] = useState(card.name)
+  const [selectedCard, setSelectedCard] = useState(null)
+  const [selectedVariant, setSelectedVariant] = useState(card.pokemon_variant || '')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!card.pokemon_card_id) return
+    const variantParam = card.pokemon_variant
+      ? `&variant=${encodeURIComponent(card.pokemon_variant)}`
+      : ''
+    fetch(`/api/pokemon-price?id=${encodeURIComponent(card.pokemon_card_id)}${variantParam}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.results?.[0]) setSelectedCard(data.results[0])
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function handleSelect(c, variant) {
+    setSelectedCard(c)
+    setSelectedVariant(variant)
+    setName(c.name)
+  }
+
+  function clearSelection() {
+    setSelectedCard(null)
+    setSelectedVariant('')
+  }
+
+  async function save() {
+    if (!name.trim()) return
+    setSaving(true)
+    const { error } = await supabase
+      .from('cards')
+      .update({
+        name: name.trim(),
+        pokemon_card_id: card.category === 'pokemon' ? selectedCard?.id ?? null : null,
+        pokemon_variant: card.category === 'pokemon' ? selectedVariant || null : null,
+      })
+      .eq('id', card.id)
+    setSaving(false)
+    if (!error) onSaved()
+  }
+
+  return (
+    <div className="edit-card-form">
+      {card.category === 'pokemon' ? (
+        <PokemonMatchPicker
+          name={name}
+          onNameChange={setName}
+          selectedCard={selectedCard}
+          selectedVariant={selectedVariant}
+          onSelect={handleSelect}
+          onClear={clearSelection}
+        />
+      ) : (
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
+      )}
+      <div className="edit-actions">
+        <button type="button" onClick={save} disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button type="button" className="change-match-btn" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function CardTile({ card, livePrice, onDelete, onUpdated }) {
+  const [editing, setEditing] = useState(false)
   const displayPrice = livePrice ?? card.purchase_price
   const gain =
     livePrice != null && card.purchase_price
@@ -138,27 +370,56 @@ function CardTile({ card, livePrice, onDelete }) {
   return (
     <div className="card-tile">
       {card.image_url ? (
-        <img src={card.image_url} alt={card.name} />
+        <img
+          className="zoomable"
+          src={card.image_url}
+          alt={card.name}
+          onClick={(e) => openImage(e, card.image_url)}
+        />
       ) : (
         <div className="card-tile-noimg">No photo</div>
       )}
       <div className="card-tile-body">
-        <span className={'category-badge ' + card.category}>{card.category}</span>
-        <h3>{card.name}</h3>
-        {card.purchase_price != null && (
-          <p className="hint-text">Bought: £{card.purchase_price.toFixed(2)}</p>
+        {editing ? (
+          <EditCardForm
+            card={card}
+            onCancel={() => setEditing(false)}
+            onSaved={() => {
+              setEditing(false)
+              onUpdated(card.id)
+            }}
+          />
+        ) : (
+          <>
+            <span className={'category-badge ' + card.category}>{card.category}</span>
+            <h3>{card.name}</h3>
+            {card.pokemon_variant && (
+              <p className="hint-text">{variantLabel(card.pokemon_variant)}</p>
+            )}
+            {card.purchase_price != null && (
+              <p className="hint-text">Bought: £{card.purchase_price.toFixed(2)}</p>
+            )}
+            <p className="current-price">
+              {displayPrice != null ? `£${Number(displayPrice).toFixed(2)}` : 'No price data'}
+            </p>
+            {gain != null && (
+              <p className={'gain' + (gain >= 0 ? ' up' : ' down')}>
+                {gain >= 0 ? '+' : ''}£{gain.toFixed(2)}
+              </p>
+            )}
+            <div className="tile-actions">
+              <button className="edit-btn" onClick={() => setEditing(true)}>
+                Edit
+              </button>
+              <button className="delete-btn" onClick={() => onDelete(card.id)}>
+                Remove
+              </button>
+              {card.pokemon_card_id && (
+                <span className="matched-badge" title="Matched to a real card">✓</span>
+              )}
+            </div>
+          </>
         )}
-        <p className="current-price">
-          {displayPrice != null ? `£${Number(displayPrice).toFixed(2)}` : 'No price data'}
-        </p>
-        {gain != null && (
-          <p className={'gain' + (gain >= 0 ? ' up' : ' down')}>
-            {gain >= 0 ? '+' : ''}£{gain.toFixed(2)}
-          </p>
-        )}
-        <button className="delete-btn" onClick={() => onDelete(card.id)}>
-          Remove
-        </button>
       </div>
     </div>
   )
@@ -169,6 +430,7 @@ export default function App() {
   const [cards, setCards] = useState([])
   const [livePrices, setLivePrices] = useState({})
   const [loading, setLoading] = useState(true)
+  const [matchedFirst, setMatchedFirst] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -195,8 +457,18 @@ export default function App() {
   useEffect(() => {
     cards.forEach((card) => {
       if (livePrices[card.id] !== undefined) return
-      const endpoint = card.category === 'pokemon' ? '/api/pokemon-price' : '/api/football-price'
-      fetch(`${endpoint}?name=${encodeURIComponent(card.name)}`)
+
+      let url
+      if (card.category === 'pokemon' && card.pokemon_card_id) {
+        url = `/api/pokemon-price?id=${encodeURIComponent(card.pokemon_card_id)}`
+        if (card.pokemon_variant) url += `&variant=${encodeURIComponent(card.pokemon_variant)}`
+      } else if (card.category === 'pokemon') {
+        url = `/api/pokemon-price?name=${encodeURIComponent(card.name)}`
+      } else {
+        url = `/api/football-price?name=${encodeURIComponent(card.name)}`
+      }
+
+      fetch(url)
         .then((r) => r.json())
         .then((data) => {
           const price =
@@ -216,6 +488,15 @@ export default function App() {
     setCards((prev) => prev.filter((c) => c.id !== id))
   }
 
+  async function handleCardUpdated(id) {
+    setLivePrices((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+    await loadCards()
+  }
+
   if (!session) {
     return <AuthGate />
   }
@@ -224,6 +505,10 @@ export default function App() {
     const price = livePrices[card.id] ?? card.purchase_price ?? 0
     return sum + Number(price || 0)
   }, 0)
+
+  const displayCards = matchedFirst
+    ? [...cards].sort((a, b) => (b.pokemon_card_id ? 1 : 0) - (a.pokemon_card_id ? 1 : 0))
+    : cards
 
   return (
     <div className="app-root">
@@ -241,18 +526,29 @@ export default function App() {
         <AddCardForm userId={session.user.id} onAdded={loadCards} />
 
         <section className="card-grid-section">
-          <h2>Your Collection ({cards.length})</h2>
+          <div className="collection-header">
+            <h2>Your Collection ({cards.length})</h2>
+            <label className="matched-first-toggle">
+              <input
+                type="checkbox"
+                checked={matchedFirst}
+                onChange={(e) => setMatchedFirst(e.target.checked)}
+              />
+              Matched cards first
+            </label>
+          </div>
           {loading && <p className="hint-text">Loading…</p>}
           {!loading && cards.length === 0 && (
             <p className="hint-text">No cards yet — add your first one above.</p>
           )}
           <div className="card-grid">
-            {cards.map((card) => (
+            {displayCards.map((card) => (
               <CardTile
                 key={card.id}
                 card={card}
                 livePrice={livePrices[card.id]}
                 onDelete={deleteCard}
+                onUpdated={handleCardUpdated}
               />
             ))}
           </div>

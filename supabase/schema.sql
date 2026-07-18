@@ -11,6 +11,11 @@ create table if not exists public.cards (
   created_at timestamptz default now()
 );
 
+-- Specific print/variant the owner picked (e.g. reverse holofoil), so live
+-- pricing looks up the exact card instead of re-guessing from the name.
+alter table public.cards add column if not exists pokemon_card_id text;
+alter table public.cards add column if not exists pokemon_variant text;
+
 alter table public.cards enable row level security;
 
 drop policy if exists "Users can view their own cards" on public.cards;
