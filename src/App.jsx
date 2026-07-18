@@ -463,6 +463,9 @@ function CardTile({ card, livePrice, onDelete, onUpdated }) {
             <p className="current-price">
               {displayPrice != null ? `£${Number(displayPrice).toFixed(2)}` : 'No price data'}
             </p>
+            {card.category === 'football' && livePrice != null && (
+              <p className="hint-text">Avg. asking price (eBay)</p>
+            )}
             {gain != null && (
               <p className={'gain' + (gain >= 0 ? ' up' : ' down')}>
                 {gain >= 0 ? '+' : ''}£{gain.toFixed(2)}
