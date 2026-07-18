@@ -466,6 +466,16 @@ function CardTile({ card, livePrice, onDelete, onUpdated }) {
             {card.category === 'football' && livePrice != null && (
               <p className="hint-text">Avg. asking price (eBay)</p>
             )}
+            {card.category === 'football' && (
+              <a
+                className="sold-link"
+                href={`https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(card.name)}&LH_Sold=1&LH_Complete=1`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View sold prices ↗
+              </a>
+            )}
             {gain != null && (
               <p className={'gain' + (gain >= 0 ? ' up' : ' down')}>
                 {gain >= 0 ? '+' : ''}£{gain.toFixed(2)}
@@ -627,6 +637,25 @@ export default function App() {
           </div>
         </section>
       </main>
+
+      <footer className="site-footer">
+        <p className="mission">
+          Card Vault is a personal portfolio tracker for Pokemon and football/soccer trading
+          cards — built to keep collection value in one place, for free.
+        </p>
+        <p className="data-attribution">
+          Pokemon pricing from the{' '}
+          <a href="https://pokemontcg.io" target="_blank" rel="noreferrer">
+            Pokemon TCG API
+          </a>{' '}
+          (TCGPlayer &amp; Cardmarket market data). Football/soccer pricing from{' '}
+          <a href="https://developer.ebay.com" target="_blank" rel="noreferrer">
+            eBay's Browse API
+          </a>{' '}
+          — average active listing prices, not confirmed sold prices. Prices are indicative
+          only and may not be fully accurate or up to date.
+        </p>
+      </footer>
     </div>
   )
 }
