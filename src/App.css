@@ -187,6 +187,7 @@ body {
   color: #ecdff5;
   cursor: pointer;
   font-family: inherit;
+  text-decoration: none;
 }
 
 .match-item:hover {
@@ -351,13 +352,13 @@ body {
 }
 
 .category-badge.pokemon {
-  background: #2e5c3d;
-  color: #7fd99a;
+  background: #232e6b;
+  color: #8ea1f0;
 }
 
 .category-badge.football {
-  background: #3a1414;
-  color: #ff8080;
+  background: #4a2e0a;
+  color: #f7a93e;
 }
 
 .card-tile-body h3 {

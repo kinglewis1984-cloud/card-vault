@@ -169,6 +169,74 @@ function PokemonMatchPicker({ name, onNameChange, selectedCard, selectedVariant,
   )
 }
 
+// Football/soccer has no fixed card database to match against (eBay is
+// live listings, not a catalog), so this just previews real listings for
+// the typed name so the user can sanity-check it finds the right thing —
+// there's nothing to "select", the price fetch always re-searches by name.
+function FootballFinder({ name, onNameChange }) {
+  const [searching, setSearching] = useState(false)
+  const [listings, setListings] = useState(null)
+  const [notConfigured, setNotConfigured] = useState(false)
+
+  async function search() {
+    if (!name.trim()) return
+    setSearching(true)
+    setNotConfigured(false)
+    try {
+      const r = await fetch(`/api/football-price?name=${encodeURIComponent(name.trim())}`)
+      const data = await r.json()
+      if (!data.configured) {
+        setNotConfigured(true)
+        setListings(null)
+      } else {
+        setListings(data.listings || [])
+      }
+    } catch {
+      setListings([])
+    }
+    setSearching(false)
+  }
+
+  return (
+    <>
+      <div className="name-search-row">
+        <input
+          type="text"
+          placeholder="Card name (e.g. Tonali auto)"
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+          required
+        />
+        <button type="button" onClick={search} disabled={searching || !name.trim()}>
+          {searching ? '…' : 'Find'}
+        </button>
+      </div>
+
+      {notConfigured && (
+        <p className="hint-text">eBay pricing isn't set up yet — this card will show no price for now.</p>
+      )}
+      {listings && listings.length === 0 && (
+        <p className="hint-text">No matching listings found — try adjusting the name.</p>
+      )}
+      {listings && listings.length > 0 && (
+        <div className="match-list">
+          {listings.map((item, i) => (
+            <a key={i} className="match-item" href={item.url} target="_blank" rel="noreferrer">
+              {item.image && <img src={item.image} alt={item.title} />}
+              <span>
+                <strong>{item.title}</strong>
+                <span className="hint-text">
+                  {item.price != null ? `£${item.price.toFixed(2)}` : 'No price'}
+                </span>
+              </span>
+            </a>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
 function AddCardForm({ userId, onAdded }) {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('pokemon')
@@ -225,7 +293,6 @@ function AddCardForm({ userId, onAdded }) {
       setPurchasePrice('')
       setPurchaseDate('')
       setImageFile(null)
-      setMatches([])
       clearSelection()
       onAdded()
     }
@@ -244,13 +311,7 @@ function AddCardForm({ userId, onAdded }) {
           onClear={clearSelection}
         />
       ) : (
-        <input
-          type="text"
-          placeholder="Card name (e.g. Tonali auto)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
+        <FootballFinder name={name} onNameChange={setName} />
       )}
 
       <select
@@ -345,7 +406,7 @@ function EditCardForm({ card, onSaved, onCancel }) {
           onClear={clearSelection}
         />
       ) : (
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
+        <FootballFinder name={name} onNameChange={setName} />
       )}
       <div className="edit-actions">
         <button type="button" onClick={save} disabled={saving}>
