@@ -239,7 +239,7 @@ function FootballFinder({ name, onNameChange }) {
 
 function AddCardForm({ userId, onAdded }) {
   const [name, setName] = useState('')
-  const [category, setCategory] = useState('pokemon')
+  const [category, setCategory] = useState('football')
   const [purchasePrice, setPurchasePrice] = useState('')
   const [purchaseDate, setPurchaseDate] = useState('')
   const [imageFile, setImageFile] = useState(null)
@@ -321,8 +321,8 @@ function AddCardForm({ userId, onAdded }) {
           clearSelection()
         }}
       >
-        <option value="pokemon">Pokemon</option>
         <option value="football">Football</option>
+        <option value="pokemon">Pokemon</option>
       </select>
       <input
         type="number"
