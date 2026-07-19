@@ -37,7 +37,7 @@ function AuthGate() {
   return (
     <div className="auth-gate">
       <h1>CARD VAULT</h1>
-      <p className="tagline">Your Pokemon &amp; football card portfolio, tracked live.</p>
+      <p className="tagline">Your football &amp; Pokemon card portfolio, tracked live.</p>
       <form onSubmit={sendMagicLink}>
         {sent ? (
           <p className="hint-text">Check your email for a sign-in link.</p>
@@ -237,7 +237,7 @@ function FootballFinder({ name, onNameChange }) {
   )
 }
 
-function AddCardForm({ userId, onAdded }) {
+function AddCardForm({ userId, onAdded, existingCards }) {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('football')
   const [purchasePrice, setPurchasePrice] = useState('')
@@ -262,6 +262,22 @@ function AddCardForm({ userId, onAdded }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!name.trim()) return
+
+    // Football has no variant/print system to distinguish two same-named
+    // entries (unlike Pokemon, where a repeated name is often a genuinely
+    // different holo/reverse-holo/parallel), so only warn there.
+    if (category === 'football') {
+      const isDuplicate = existingCards.some(
+        (c) => c.category === 'football' && c.name.trim().toLowerCase() === name.trim().toLowerCase()
+      )
+      if (isDuplicate) {
+        const proceed = window.confirm(
+          `You already have "${name.trim()}" in your collection. Add another anyway?`
+        )
+        if (!proceed) return
+      }
+    }
+
     setSaving(true)
 
     let imageUrl = null
@@ -612,7 +628,7 @@ export default function App() {
       </header>
 
       <main className="layout">
-        <AddCardForm userId={session.user.id} onAdded={loadCards} />
+        <AddCardForm userId={session.user.id} onAdded={loadCards} existingCards={cards} />
 
         <section className="card-grid-section">
           <div className="collection-header">
