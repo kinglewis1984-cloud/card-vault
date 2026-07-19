@@ -294,8 +294,9 @@ function AddCardForm({ userId, onAdded, existingCards }) {
     if (!name.trim()) return
 
     // Football has no variant/print system to distinguish two same-named
-    // entries (unlike Pokemon, where a repeated name is often a genuinely
-    // different holo/reverse-holo/parallel), so only warn there.
+    // entries, so name alone means duplicate. Pokemon cards can legitimately
+    // share a name across different prints (holo/reverse-holo/parallel), so
+    // there it's the matched card + variant together that identifies a dupe.
     if (category === 'football') {
       const isDuplicate = existingCards.some(
         (c) => c.category === 'football' && c.name.trim().toLowerCase() === name.trim().toLowerCase()
@@ -303,6 +304,34 @@ function AddCardForm({ userId, onAdded, existingCards }) {
       if (isDuplicate) {
         const proceed = window.confirm(
           `You already have "${name.trim()}" in your collection. Add another anyway?`
+        )
+        if (!proceed) return
+      }
+    } else if (category === 'pokemon') {
+      // Not every add goes through Find + pick a match — plenty of adds are
+      // just a typed name. Use the matched card's id when we have one
+      // (most precise), otherwise fall back to the typed name so an
+      // unmatched add still gets checked.
+      const newVariant = selectedVariant || ''
+      const newName = (selectedCard ? selectedCard.name : name).trim().toLowerCase()
+      const isDuplicate = existingCards.some((c) => {
+        if (c.category !== 'pokemon') return false
+        const sameCard =
+          c.pokemon_card_id && selectedCard?.id
+            ? c.pokemon_card_id === selectedCard.id
+            : c.name.trim().toLowerCase() === newName
+        if (!sameCard) return false
+        const existingVariant = c.pokemon_variant || ''
+        // If either side has no recorded variant (e.g. an older entry
+        // added before variant tracking existed), don't let a variant
+        // mismatch hide what's otherwise the same card.
+        if (!existingVariant || !newVariant) return true
+        return existingVariant === newVariant
+      })
+      if (isDuplicate) {
+        const variant = selectedVariant ? ` (${variantLabel(selectedVariant)})` : ''
+        const proceed = window.confirm(
+          `You already have "${name.trim()}"${variant} in your collection. Add another anyway?`
         )
         if (!proceed) return
       }
