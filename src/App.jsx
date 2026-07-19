@@ -84,6 +84,20 @@ function AuthGate() {
             <p>Follow on X</p>
           </div>
         </a>
+
+        <a
+          className="sponsor-banner"
+          href="https://footballfanclubz.com"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <img src="/hnlkicinit-arsenal-logo.png" alt="Football Fan Clubz logo" />
+          <div>
+            <span className="promo-label">Sponsored by</span>
+            <h3>Football Clubz</h3>
+            <p>Visit the site</p>
+          </div>
+        </a>
       </div>
     </div>
   )
@@ -798,6 +812,20 @@ export default function App() {
               <span className="promo-label">Sponsored by</span>
               <h3>HnLkicinit</h3>
               <p>Follow on X</p>
+            </div>
+          </a>
+
+          <a
+            className="sponsor-banner"
+            href="https://footballfanclubz.com"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <img src="/hnlkicinit-arsenal-logo.png" alt="Football Fan Clubz logo" />
+            <div>
+              <span className="promo-label">Sponsored by</span>
+              <h3>Football Clubz</h3>
+              <p>Visit the site</p>
             </div>
           </a>
         </div>
