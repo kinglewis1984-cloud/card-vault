@@ -50,6 +50,17 @@ body {
   width: 280px;
 }
 
+.auth-gate .sponsor-row {
+  margin-top: 32px;
+  width: 100%;
+  max-width: 420px;
+  flex-wrap: wrap;
+}
+
+.auth-gate .sponsor-banner {
+  min-width: 180px;
+}
+
 .auth-gate input,
 .add-card-form input,
 .add-card-form select {

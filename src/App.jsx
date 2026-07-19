@@ -55,6 +55,36 @@ function AuthGate() {
           </>
         )}
       </form>
+
+      <div className="sponsor-row">
+        <a
+          className="sponsor-banner"
+          href="https://x.com/lglondoncrypto1"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <img src="/lglondoncrypto-logo.png" alt="LG London Crypto logo" />
+          <div>
+            <span className="promo-label">Sponsored by</span>
+            <h3>LG London Crypto</h3>
+            <p>Follow on X</p>
+          </div>
+        </a>
+
+        <a
+          className="sponsor-banner"
+          href="https://x.com/HnLkicin"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <img src="/hnlkicinit-arsenal-logo.png" alt="HnLkicinit logo" />
+          <div>
+            <span className="promo-label">Sponsored by</span>
+            <h3>HnLkicinit</h3>
+            <p>Follow on X</p>
+          </div>
+        </a>
+      </div>
     </div>
   )
 }
