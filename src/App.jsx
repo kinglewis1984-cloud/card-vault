@@ -6,6 +6,31 @@ function variantLabel(key) {
   return key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase())
 }
 
+// Groups cards that are the same underlying card (regardless of print/
+// variant) so doubles sit next to each other instead of scattered by date.
+function duplicateGroupKey(card) {
+  if (card.category === 'football') {
+    return `football:${card.name.trim().toLowerCase()}`
+  }
+  if (card.pokemon_card_id) {
+    return `pokemon-id:${card.pokemon_card_id}`
+  }
+  return `pokemon-name:${card.name.trim().toLowerCase()}`
+}
+
+function groupDuplicates(cards) {
+  const firstSeenIndex = new Map()
+  cards.forEach((c, i) => {
+    const key = duplicateGroupKey(c)
+    if (!firstSeenIndex.has(key)) firstSeenIndex.set(key, i)
+  })
+  // Array.prototype.sort is stable, so cards sharing a key keep their
+  // original relative order once grouped together.
+  return [...cards].sort(
+    (a, b) => firstSeenIndex.get(duplicateGroupKey(a)) - firstSeenIndex.get(duplicateGroupKey(b))
+  )
+}
+
 // Opens an image full-size in a new tab so it can be checked against the
 // physical card. stopPropagation matters where the image sits inside a
 // clickable button/tile (e.g. a match result) so zooming doesn't also
@@ -594,6 +619,7 @@ export default function App() {
   const [livePrices, setLivePrices] = useState({})
   const [loading, setLoading] = useState(true)
   const [matchedFirst, setMatchedFirst] = useState(false)
+  const [groupDoubles, setGroupDoubles] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
@@ -677,9 +703,10 @@ export default function App() {
     return sum + Number(price || 0)
   }, 0)
 
-  const sortedCards = matchedFirst
-    ? [...cards].sort((a, b) => (b.pokemon_card_id ? 1 : 0) - (a.pokemon_card_id ? 1 : 0))
-    : cards
+  let sortedCards = groupDoubles ? groupDuplicates(cards) : cards
+  if (matchedFirst) {
+    sortedCards = [...sortedCards].sort((a, b) => (b.pokemon_card_id ? 1 : 0) - (a.pokemon_card_id ? 1 : 0))
+  }
 
   const pageCount = Math.max(1, Math.ceil(sortedCards.length / pageSize))
   const currentPage = Math.min(page, pageCount)
@@ -714,6 +741,14 @@ export default function App() {
                   onChange={(e) => setMatchedFirst(e.target.checked)}
                 />
                 Matched cards first
+              </label>
+              <label className="matched-first-toggle">
+                <input
+                  type="checkbox"
+                  checked={groupDoubles}
+                  onChange={(e) => setGroupDoubles(e.target.checked)}
+                />
+                Group duplicates together
               </label>
               <label className="page-size-select">
                 Per page:
