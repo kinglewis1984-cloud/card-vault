@@ -485,6 +485,8 @@ function AddCardForm({ userId, onAdded, existingCards }) {
       setImageFile(null)
       clearSelection()
       onAdded()
+    } else {
+      setUploadError(`Card didn't save: ${error.message}`)
     }
   }
 
