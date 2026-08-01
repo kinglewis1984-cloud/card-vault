@@ -728,9 +728,16 @@ export default function App() {
   }, [session])
 
   useEffect(() => {
-    cards.forEach((card) => {
-      if (livePrices[card.id] !== undefined) return
+    let cancelled = false
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
+    // Fetching every card's price the instant the page loads used to fire
+    // 20+ parallel requests at once, which trips the free (no-API-key) rate
+    // limit on api.pokemontcg.io — most of those calls came back 500 and got
+    // silently recorded as "no price data" even though the card had real
+    // pricing. Fetching one at a time with a short gap, and retrying once on
+    // failure, keeps well under the rate limit instead of flooding it.
+    async function fetchPrice(card, attempt = 0) {
       let url
       if (card.category === 'pokemon' && card.pokemon_card_id) {
         url = `/api/pokemon-price?id=${encodeURIComponent(card.pokemon_card_id)}`
@@ -741,17 +748,35 @@ export default function App() {
         url = `/api/football-price?name=${encodeURIComponent(card.name)}`
       }
 
-      fetch(url)
-        .then((r) => r.json())
-        .then((data) => {
-          const price =
-            card.category === 'pokemon'
-              ? data.results?.[0]?.price ?? null
-              : data.average ?? null
-          setLivePrices((prev) => ({ ...prev, [card.id]: price }))
-        })
-        .catch(() => setLivePrices((prev) => ({ ...prev, [card.id]: null })))
-    })
+      try {
+        const r = await fetch(url)
+        const data = await r.json()
+        if (!r.ok) throw new Error('Upstream error')
+        return card.category === 'pokemon' ? data.results?.[0]?.price ?? null : data.average ?? null
+      } catch {
+        if (attempt < 1) {
+          await wait(1000)
+          return fetchPrice(card, attempt + 1)
+        }
+        return null
+      }
+    }
+
+    async function loadPrices() {
+      for (const card of cards) {
+        if (cancelled) return
+        if (livePrices[card.id] !== undefined) continue
+        const price = await fetchPrice(card)
+        if (cancelled) return
+        setLivePrices((prev) => ({ ...prev, [card.id]: price }))
+        await wait(200)
+      }
+    }
+
+    loadPrices()
+    return () => {
+      cancelled = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards])
 
