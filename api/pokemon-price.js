@@ -15,6 +15,27 @@ function variantLabel(key) {
   return VARIANT_LABELS[key] || key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase())
 }
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// api.pokemontcg.io's free (no-API-key) tier is prone to intermittent 500s
+// under normal load, unrelated to how much traffic we send it. Retrying a
+// few times with backoff rides out those blips instead of surfacing a
+// transient failure as "no price data" for a card that has real pricing.
+async function fetchWithRetry(url, attempts = 4) {
+  let lastError
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const response = await fetch(url)
+      if (response.ok) return response
+      lastError = new Error(`Upstream ${response.status}`)
+    } catch (e) {
+      lastError = e
+    }
+    if (i < attempts - 1) await wait(500 * (i + 1))
+  }
+  throw lastError
+}
+
 // Builds a result that includes every priced print variant (normal, holofoil,
 // reverse holofoil, etc.) so the caller can tell them apart, plus a default
 // price (the requested variant if given, else the first priced variant).
@@ -58,8 +79,7 @@ export default async function handler(req, res) {
     // Exact lookup by card id (used for re-pricing an already-added card
     // against the specific print/variant the owner picked).
     if (id) {
-      const response = await fetch(`https://api.pokemontcg.io/v2/cards/${encodeURIComponent(id)}`)
-      if (!response.ok) throw new Error('Upstream request failed')
+      const response = await fetchWithRetry(`https://api.pokemontcg.io/v2/cards/${encodeURIComponent(id)}`)
       const data = await response.json()
       const results = data.data ? [buildCardResult(data.data, variant)] : []
       res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=1800')
@@ -73,8 +93,7 @@ export default async function handler(req, res) {
     }
 
     const exactUrl = `https://api.pokemontcg.io/v2/cards?q=name:"${encodeURIComponent(name)}"&pageSize=10`
-    let response = await fetch(exactUrl)
-    if (!response.ok) throw new Error('Upstream request failed')
+    let response = await fetchWithRetry(exactUrl)
     let data = await response.json()
 
     // Exact phrase match failed (e.g. name formatted differently, like "Mega
@@ -85,8 +104,8 @@ export default async function handler(req, res) {
       if (words.length) {
         const wildcardQuery = words.map((w) => `name:*${encodeURIComponent(w)}*`).join(' ')
         const fallbackUrl = `https://api.pokemontcg.io/v2/cards?q=${wildcardQuery}&pageSize=10`
-        response = await fetch(fallbackUrl)
-        if (response.ok) data = await response.json()
+        response = await fetchWithRetry(fallbackUrl)
+        data = await response.json()
       }
     }
 
