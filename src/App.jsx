@@ -769,7 +769,7 @@ export default function App() {
     // A handful of cards in flight at once keeps well under the burst that
     // originally tripped the upstream rate limit, without making a large
     // collection take minutes to fully price up.
-    const CONCURRENCY = 3
+    const CONCURRENCY = 6
     async function loadPrices() {
       const queue = cards.filter((card) => livePrices[card.id] === undefined)
       let next = 0
@@ -854,6 +854,12 @@ export default function App() {
         <section className="card-grid-section">
           <div className="collection-header">
             <h2>Your Collection ({cards.length})</h2>
+            {(() => {
+              const pending = cards.filter((c) => livePrices[c.id] === undefined).length
+              return pending > 0 ? (
+                <p className="hint-text">Loading prices… {cards.length - pending}/{cards.length}</p>
+              ) : null
+            })()}
             <div className="collection-controls">
               <label className="matched-first-toggle">
                 <input
