@@ -2,6 +2,51 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import './App.css'
 
+// Perceptual hash (aHash): downscale to 8x8 grayscale, compare each pixel
+// to the average brightness. Similar photos produce similar bit patterns
+// even with minor lighting/compression differences, so two uploads of the
+// same physical card (or the same photo re-uploaded) end up close in
+// Hamming distance even when the files aren't byte-identical.
+async function computeImageHash(file) {
+  return new Promise((resolve, reject) => {
+    const size = 8
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, size, size)
+      const { data } = ctx.getImageData(0, 0, size, size)
+      const gray = []
+      for (let i = 0; i < data.length; i += 4) {
+        gray.push((data[i] + data[i + 1] + data[i + 2]) / 3)
+      }
+      const avg = gray.reduce((a, b) => a + b, 0) / gray.length
+      URL.revokeObjectURL(url)
+      resolve(gray.map((g) => (g >= avg ? '1' : '0')).join(''))
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Failed to load image'))
+    }
+    img.src = url
+  })
+}
+
+function hammingDistance(a, b) {
+  let dist = 0
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) dist++
+  }
+  return dist
+}
+
+// Out of 64 bits — lower is stricter. 10 catches re-uploads/retakes of the
+// same physical card while still tolerating normal lighting/angle variance.
+const PHOTO_HASH_THRESHOLD = 10
+
 function variantLabel(key) {
   return key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase())
 }
@@ -313,6 +358,7 @@ function AddCardForm({ userId, onAdded, existingCards }) {
   const [purchaseDate, setPurchaseDate] = useState('')
   const [imageFile, setImageFile] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [uploadError, setUploadError] = useState('')
 
   const [selectedCard, setSelectedCard] = useState(null)
   const [selectedVariant, setSelectedVariant] = useState('')
@@ -336,14 +382,40 @@ function AddCardForm({ userId, onAdded, existingCards }) {
     // entries, so name alone means duplicate. Pokemon cards can legitimately
     // share a name across different prints (holo/reverse-holo/parallel), so
     // there it's the matched card + variant together that identifies a dupe.
+    // Not extending the photo check to Pokemon: two different variants of
+    // the same card can look near-identical in a photo (same artwork, subtle
+    // foil difference), which would falsely flag exactly the case the
+    // variant-aware name check exists to allow through.
+    let imageHash = null
     if (category === 'football') {
-      const isDuplicate = existingCards.some(
+      if (imageFile) {
+        try {
+          imageHash = await computeImageHash(imageFile)
+        } catch {
+          imageHash = null
+        }
+      }
+
+      const nameMatch = existingCards.some(
         (c) => c.category === 'football' && c.name.trim().toLowerCase() === name.trim().toLowerCase()
       )
-      if (isDuplicate) {
-        const proceed = window.confirm(
-          `You already have "${name.trim()}" in your collection. Add another anyway?`
+      const photoMatch =
+        imageHash &&
+        existingCards.some(
+          (c) =>
+            c.category === 'football' &&
+            c.image_hash &&
+            hammingDistance(c.image_hash, imageHash) <= PHOTO_HASH_THRESHOLD
         )
+
+      if (nameMatch || photoMatch) {
+        const reason =
+          nameMatch && photoMatch
+            ? 'the name and photo both match one you already have'
+            : nameMatch
+              ? 'the name matches one you already have'
+              : 'the photo looks very similar to one you already have'
+        const proceed = window.confirm(`You may already have this card — ${reason}. Add another anyway?`)
         if (!proceed) return
       }
     } else if (category === 'pokemon') {
@@ -376,17 +448,20 @@ function AddCardForm({ userId, onAdded, existingCards }) {
       }
     }
 
+    setUploadError('')
     setSaving(true)
 
     let imageUrl = null
     if (imageFile) {
       const path = `${userId}/${Date.now()}-${imageFile.name}`
-      const { error: uploadError } = await supabase.storage
+      const { error: storageError } = await supabase.storage
         .from('card-images')
         .upload(path, imageFile)
-      if (!uploadError) {
+      if (!storageError) {
         const { data } = supabase.storage.from('card-images').getPublicUrl(path)
         imageUrl = data.publicUrl
+      } else {
+        setUploadError(`Photo didn't upload: ${storageError.message}. Card will be saved without it.`)
       }
     }
 
@@ -395,6 +470,7 @@ function AddCardForm({ userId, onAdded, existingCards }) {
       name: name.trim(),
       category,
       image_url: imageUrl,
+      image_hash: imageHash,
       purchase_price: purchasePrice ? Number(purchasePrice) : null,
       purchase_date: purchaseDate || null,
       pokemon_card_id: category === 'pokemon' ? selectedCard?.id ?? null : null,
@@ -453,8 +529,12 @@ function AddCardForm({ userId, onAdded, existingCards }) {
       <input
         type="file"
         accept="image/*"
-        onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+        onChange={(e) => {
+          setImageFile(e.target.files?.[0] || null)
+          setUploadError('')
+        }}
       />
+      {uploadError && <p className="hint-text error">{uploadError}</p>}
       <button type="submit" disabled={saving}>
         {saving ? 'Adding…' : 'Add Card'}
       </button>

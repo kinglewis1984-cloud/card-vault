@@ -16,6 +16,10 @@ create table if not exists public.cards (
 alter table public.cards add column if not exists pokemon_card_id text;
 alter table public.cards add column if not exists pokemon_variant text;
 
+-- 64-bit perceptual image hash (as a binary string) for football cards,
+-- used to flag likely duplicate photo uploads.
+alter table public.cards add column if not exists image_hash text;
+
 alter table public.cards enable row level security;
 
 drop policy if exists "Users can view their own cards" on public.cards;
