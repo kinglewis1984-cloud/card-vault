@@ -657,7 +657,11 @@ function CardTile({ card, livePrice, onDelete, onUpdated }) {
               <p className="hint-text">Bought: £{card.purchase_price.toFixed(2)}</p>
             )}
             <p className="current-price">
-              {displayPrice != null ? `£${Number(displayPrice).toFixed(2)}` : 'No price data'}
+              {displayPrice != null
+                ? `£${Number(displayPrice).toFixed(2)}`
+                : livePrice === undefined
+                  ? 'Loading price…'
+                  : 'No price data'}
             </p>
             {card.category === 'football' && livePrice != null && (
               <p className="hint-text">Avg. asking price (eBay)</p>
@@ -762,15 +766,25 @@ export default function App() {
       }
     }
 
+    // A handful of cards in flight at once keeps well under the burst that
+    // originally tripped the upstream rate limit, without making a large
+    // collection take minutes to fully price up.
+    const CONCURRENCY = 3
     async function loadPrices() {
-      for (const card of cards) {
-        if (cancelled) return
-        if (livePrices[card.id] !== undefined) continue
-        const price = await fetchPrice(card)
-        if (cancelled) return
-        setLivePrices((prev) => ({ ...prev, [card.id]: price }))
-        await wait(200)
+      const queue = cards.filter((card) => livePrices[card.id] === undefined)
+      let next = 0
+      async function worker() {
+        while (!cancelled) {
+          const i = next++
+          if (i >= queue.length) return
+          const card = queue[i]
+          const price = await fetchPrice(card)
+          if (cancelled) return
+          setLivePrices((prev) => ({ ...prev, [card.id]: price }))
+          await wait(150)
+        }
       }
+      await Promise.all(Array.from({ length: CONCURRENCY }, worker))
     }
 
     loadPrices()
