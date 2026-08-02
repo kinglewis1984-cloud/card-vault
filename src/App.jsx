@@ -842,6 +842,14 @@ export default function App() {
     const priceOf = (c) => Number(livePrices[c.id] ?? c.purchase_price ?? 0)
     sortedCards = [...sortedCards].sort((a, b) => priceOf(b) - priceOf(a))
   }
+  // Cards with no resolved price (and no purchase price to fall back to)
+  // always sink to the end, on top of whatever other sort is active — a
+  // stable sort keeps everything else's relative order intact.
+  sortedCards = [...sortedCards].sort((a, b) => {
+    const aHasPrice = (livePrices[a.id] ?? a.purchase_price) != null ? 0 : 1
+    const bHasPrice = (livePrices[b.id] ?? b.purchase_price) != null ? 0 : 1
+    return aHasPrice - bHasPrice
+  })
 
   const pageCount = Math.max(1, Math.ceil(sortedCards.length / pageSize))
   const currentPage = Math.min(page, pageCount)
