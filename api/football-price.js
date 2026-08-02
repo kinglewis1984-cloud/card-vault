@@ -33,6 +33,38 @@ async function getAccessToken() {
   return cachedToken
 }
 
+// Cards added by typing the full collector description in — e.g. "Max
+// Dowman – 2025-26 Topps Merlin Chrome Premier League, RC (Rookie Card),
+// Green Refractor Parallel #97/99" — rarely match any real listing title
+// verbatim; real titles don't combine every one of those descriptors in
+// that exact wording. Strip the parenthetical notes and print numbering to
+// get a plainer query, and fall back further to just the leading words
+// (usually the player name) if even that comes back empty.
+function cleanupName(raw) {
+  return raw
+    .replace(/[–—]/g, '-')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/#?\d+\s*\/\s*\d+/g, '')
+    .replace(/,/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function buildSearchQueries(rawName) {
+  const queries = [rawName]
+
+  const cleaned = cleanupName(rawName)
+  if (cleaned) queries.push(cleaned)
+
+  const beforeDash = cleaned.split(/\s-\s/)[0].trim()
+  if (beforeDash) queries.push(beforeDash)
+
+  const words = cleaned.split(/\s+/).filter(Boolean)
+  if (words.length > 6) queries.push(words.slice(0, 6).join(' '))
+
+  return [...new Set(queries.filter(Boolean))]
+}
+
 function median(nums) {
   const sorted = [...nums].sort((a, b) => a - b)
   const mid = Math.floor(sorted.length / 2)
@@ -71,17 +103,29 @@ export default async function handler(req, res) {
   }
 
   try {
-    const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(name)}&category_ids=212&limit=10`
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_GB',
-      },
-    })
-    if (!response.ok) throw new Error('Upstream eBay request failed')
-    const data = await response.json()
+    let items = []
+    for (const query of buildSearchQueries(name)) {
+      const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&category_ids=212&limit=10`
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 6000)
+      let response
+      try {
+        response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_GB',
+          },
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timer)
+      }
+      if (!response.ok) throw new Error('Upstream eBay request failed')
+      const data = await response.json()
+      items = data.itemSummaries || []
+      if (items.length) break
+    }
 
-    const items = data.itemSummaries || []
     const prices = items.map((item) => Number(item.price?.value)).filter((p) => !Number.isNaN(p))
     const usablePrices = filterOutliers(prices)
     // Field is still called "average" for the frontend's sake, but it's a
