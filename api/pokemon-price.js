@@ -15,6 +15,27 @@ function variantLabel(key) {
   return VARIANT_LABELS[key] || key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase())
 }
 
+// Some cards were added by typing the full collector description straight
+// into the name field, e.g. `Cinccino (126/159, Journey Together, "H" stamp,
+// diamond = Uncommon)`. Sent as-is, the raw punctuation (parens, quotes, a
+// slash, an equals sign) breaks the upstream Lucene-style query parser
+// outright (500, not just zero results). Pull the real card name, number,
+// and set out of that description so the lookup both works and lands on the
+// exact print instead of a same-named card from a different set.
+function parseCardName(raw) {
+  const match = raw.match(/^(.*?)\s*\(([^)]*)\)\s*$/)
+  if (!match) return { baseName: raw.trim(), number: null, setName: null }
+
+  const baseName = match[1].trim()
+  const parts = match[2].split(',').map((p) => p.trim())
+  const numberMatch = parts[0]?.match(/^(\d+)\s*\/\s*\d+/)
+  return {
+    baseName: baseName || raw.trim(),
+    number: numberMatch ? numberMatch[1] : null,
+    setName: numberMatch ? parts[1] || null : null,
+  }
+}
+
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // api.pokemontcg.io's free (no-API-key) tier is prone to intermittent 500s
@@ -97,19 +118,36 @@ export default async function handler(req, res) {
       return
     }
 
-    const exactUrl = `https://api.pokemontcg.io/v2/cards?q=name:"${encodeURIComponent(name)}"&pageSize=10`
-    let response = await fetchWithRetry(exactUrl)
-    let data = await response.json()
+    const { baseName, number, setName } = parseCardName(name)
+    let data = { data: [] }
+
+    // Most precise: exact name + number + set, when the description had all
+    // three — pins down the exact print instead of just any card sharing
+    // the name.
+    if (number && setName) {
+      const preciseQuery = `name:"${baseName}" number:${number} set.name:"${setName}"`
+      const response = await fetchWithRetry(
+        `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(preciseQuery)}&pageSize=10`
+      )
+      data = await response.json()
+    }
+
+    // Exact phrase match on the cleaned-up name.
+    if (!data.data?.length) {
+      const exactUrl = `https://api.pokemontcg.io/v2/cards?q=name:"${encodeURIComponent(baseName)}"&pageSize=10`
+      const response = await fetchWithRetry(exactUrl)
+      data = await response.json()
+    }
 
     // Exact phrase match failed (e.g. name formatted differently, like "Mega
     // Charizard EX" vs the card's real name "M Charizard-EX") — fall back to
-    // a wildcard match on each word of the name.
+    // a wildcard match on each word of the (cleaned) name.
     if (!data.data?.length) {
-      const words = name.split(/\s+/).filter((w) => w.length > 1)
+      const words = baseName.split(/\s+/).filter((w) => w.length > 1)
       if (words.length) {
         const wildcardQuery = words.map((w) => `name:*${encodeURIComponent(w)}*`).join(' ')
         const fallbackUrl = `https://api.pokemontcg.io/v2/cards?q=${wildcardQuery}&pageSize=10`
-        response = await fetchWithRetry(fallbackUrl)
+        const response = await fetchWithRetry(fallbackUrl)
         data = await response.json()
       }
     }
