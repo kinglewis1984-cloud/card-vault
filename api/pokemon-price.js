@@ -43,11 +43,11 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 // fetch() with no timeout can then hang far longer than any retry budget
 // intends, stalling the caller. Aborting each attempt after a few seconds
 // turns a silent hang into a fast failure the retry loop can act on.
-async function fetchWithRetry(url, attempts = 3) {
+async function fetchWithRetry(url, attempts = 5) {
   let lastError
   for (let i = 0; i < attempts; i++) {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 5000)
+    const timer = setTimeout(() => controller.abort(), 4000)
     try {
       const response = await fetch(url, { signal: controller.signal })
       if (response.ok) return response
@@ -57,7 +57,7 @@ async function fetchWithRetry(url, attempts = 3) {
     } finally {
       clearTimeout(timer)
     }
-    if (i < attempts - 1) await wait(400 * (i + 1))
+    if (i < attempts - 1) await wait(300 * (i + 1))
   }
   throw lastError
 }
