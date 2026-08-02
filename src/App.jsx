@@ -710,6 +710,11 @@ export default function App() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
+  function goToPage(n) {
+    setPage(n)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
@@ -940,12 +945,16 @@ export default function App() {
           </div>
           {pageCount > 1 && (
             <div className="pagination">
-              <button type="button" onClick={() => setPage(1)} disabled={currentPage === 1}>
+              <button
+                type="button"
+                onClick={() => goToPage(1)}
+                disabled={currentPage === 1}
+              >
                 First
               </button>
               <button
                 type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => goToPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
               >
                 Prev
@@ -955,7 +964,7 @@ export default function App() {
               </span>
               <button
                 type="button"
-                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                onClick={() => goToPage(Math.min(pageCount, currentPage + 1))}
                 disabled={currentPage === pageCount}
               >
                 Next
