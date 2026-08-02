@@ -706,6 +706,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [matchedFirst, setMatchedFirst] = useState(false)
   const [groupDoubles, setGroupDoubles] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
@@ -824,7 +825,10 @@ export default function App() {
     return sum + Number(price || 0)
   }, 0)
 
-  let sortedCards = groupDoubles ? groupDuplicates(cards) : cards
+  const filteredCards =
+    categoryFilter === 'all' ? cards : cards.filter((c) => c.category === categoryFilter)
+
+  let sortedCards = groupDoubles ? groupDuplicates(filteredCards) : filteredCards
   if (matchedFirst) {
     sortedCards = [...sortedCards].sort((a, b) => (b.pokemon_card_id ? 1 : 0) - (a.pokemon_card_id ? 1 : 0))
   }
@@ -849,34 +853,61 @@ export default function App() {
       </header>
 
       <main className="layout">
-        <AddCardForm userId={session.user.id} onAdded={loadCards} existingCards={cards} />
+        <div className="sidebar-column">
+          <AddCardForm userId={session.user.id} onAdded={loadCards} existingCards={cards} />
+
+          <div className="sidebar-filters">
+            <label className="matched-first-toggle">
+              <input
+                type="checkbox"
+                checked={categoryFilter === 'football'}
+                onChange={(e) => {
+                  setCategoryFilter(e.target.checked ? 'football' : 'all')
+                  setPage(1)
+                }}
+              />
+              Football only
+            </label>
+            <label className="matched-first-toggle">
+              <input
+                type="checkbox"
+                checked={categoryFilter === 'pokemon'}
+                onChange={(e) => {
+                  setCategoryFilter(e.target.checked ? 'pokemon' : 'all')
+                  setPage(1)
+                }}
+              />
+              Pokemon only
+            </label>
+            <label className="matched-first-toggle">
+              <input
+                type="checkbox"
+                checked={matchedFirst}
+                onChange={(e) => setMatchedFirst(e.target.checked)}
+              />
+              Matched cards first
+            </label>
+            <label className="matched-first-toggle">
+              <input
+                type="checkbox"
+                checked={groupDoubles}
+                onChange={(e) => setGroupDoubles(e.target.checked)}
+              />
+              Group duplicates together
+            </label>
+          </div>
+        </div>
 
         <section className="card-grid-section">
           <div className="collection-header">
-            <h2>Your Collection ({cards.length})</h2>
+            <h2>Your Collection ({filteredCards.length})</h2>
             {(() => {
-              const pending = cards.filter((c) => livePrices[c.id] === undefined).length
+              const pending = filteredCards.filter((c) => livePrices[c.id] === undefined).length
               return pending > 0 ? (
-                <p className="hint-text">Loading prices… {cards.length - pending}/{cards.length}</p>
+                <p className="hint-text">Loading prices… {filteredCards.length - pending}/{filteredCards.length}</p>
               ) : null
             })()}
             <div className="collection-controls">
-              <label className="matched-first-toggle">
-                <input
-                  type="checkbox"
-                  checked={matchedFirst}
-                  onChange={(e) => setMatchedFirst(e.target.checked)}
-                />
-                Matched cards first
-              </label>
-              <label className="matched-first-toggle">
-                <input
-                  type="checkbox"
-                  checked={groupDoubles}
-                  onChange={(e) => setGroupDoubles(e.target.checked)}
-                />
-                Group duplicates together
-              </label>
               <label className="page-size-select">
                 Per page:
                 <select
