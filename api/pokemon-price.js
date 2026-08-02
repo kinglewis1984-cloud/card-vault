@@ -18,20 +18,25 @@ function variantLabel(key) {
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // api.pokemontcg.io's free (no-API-key) tier is prone to intermittent 500s
-// under normal load, unrelated to how much traffic we send it. Retrying a
-// few times with backoff rides out those blips instead of surfacing a
-// transient failure as "no price data" for a card that has real pricing.
-async function fetchWithRetry(url, attempts = 4) {
+// AND to occasionally just not responding at all for many seconds — a plain
+// fetch() with no timeout can then hang far longer than any retry budget
+// intends, stalling the caller. Aborting each attempt after a few seconds
+// turns a silent hang into a fast failure the retry loop can act on.
+async function fetchWithRetry(url, attempts = 3) {
   let lastError
   for (let i = 0; i < attempts; i++) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 5000)
     try {
-      const response = await fetch(url)
+      const response = await fetch(url, { signal: controller.signal })
       if (response.ok) return response
       lastError = new Error(`Upstream ${response.status}`)
     } catch (e) {
       lastError = e
+    } finally {
+      clearTimeout(timer)
     }
-    if (i < attempts - 1) await wait(500 * (i + 1))
+    if (i < attempts - 1) await wait(400 * (i + 1))
   }
   throw lastError
 }
