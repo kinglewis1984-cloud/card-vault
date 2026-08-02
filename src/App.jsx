@@ -940,6 +940,9 @@ export default function App() {
           </div>
           {pageCount > 1 && (
             <div className="pagination">
+              <button type="button" onClick={() => setPage(1)} disabled={currentPage === 1}>
+                First
+              </button>
               <button
                 type="button"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
