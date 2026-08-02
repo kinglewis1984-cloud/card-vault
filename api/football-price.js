@@ -33,6 +33,30 @@ async function getAccessToken() {
   return cachedToken
 }
 
+function median(nums) {
+  const sorted = [...nums].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
+// A plain mean gets dragged around by one wildly over/under-priced listing
+// in a small sample — e.g. an unrelated bundle or a job-lot auction mixed in
+// with single-card listings. Dropping values outside 1.5x the interquartile
+// range before taking the median keeps the estimate close to what most
+// listings actually go for. Skipped for very small samples, where IQR isn't
+// meaningful and could wipe out most of the data.
+function filterOutliers(nums) {
+  if (nums.length < 4) return nums
+  const sorted = [...nums].sort((a, b) => a - b)
+  const q1 = sorted[Math.floor(sorted.length * 0.25)]
+  const q3 = sorted[Math.floor(sorted.length * 0.75)]
+  const iqr = q3 - q1
+  const lower = q1 - 1.5 * iqr
+  const upper = q3 + 1.5 * iqr
+  const filtered = nums.filter((n) => n >= lower && n <= upper)
+  return filtered.length ? filtered : nums
+}
+
 export default async function handler(req, res) {
   const { name } = req.query
   if (!name) {
@@ -59,7 +83,10 @@ export default async function handler(req, res) {
 
     const items = data.itemSummaries || []
     const prices = items.map((item) => Number(item.price?.value)).filter((p) => !Number.isNaN(p))
-    const average = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : null
+    const usablePrices = filterOutliers(prices)
+    // Field is still called "average" for the frontend's sake, but it's a
+    // median of the outlier-filtered prices now, not a plain mean.
+    const average = usablePrices.length ? median(usablePrices) : null
 
     // Real listings (not just the average) so the caller can show what the
     // search term actually matched — there's no fixed card database for
@@ -72,7 +99,7 @@ export default async function handler(req, res) {
     }))
 
     res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=1800')
-    res.status(200).json({ configured: true, average, sampleSize: prices.length, listings })
+    res.status(200).json({ configured: true, average, sampleSize: usablePrices.length, listings })
   } catch (err) {
     res.status(500).json({ configured: true, error: 'Failed to fetch eBay price data' })
   }
