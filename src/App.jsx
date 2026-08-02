@@ -707,6 +707,7 @@ export default function App() {
   const [matchedFirst, setMatchedFirst] = useState(false)
   const [groupDoubles, setGroupDoubles] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [sortByPrice, setSortByPrice] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
@@ -837,6 +838,10 @@ export default function App() {
   if (matchedFirst) {
     sortedCards = [...sortedCards].sort((a, b) => (b.pokemon_card_id ? 1 : 0) - (a.pokemon_card_id ? 1 : 0))
   }
+  if (sortByPrice) {
+    const priceOf = (c) => Number(livePrices[c.id] ?? c.purchase_price ?? 0)
+    sortedCards = [...sortedCards].sort((a, b) => priceOf(b) - priceOf(a))
+  }
 
   const pageCount = Math.max(1, Math.ceil(sortedCards.length / pageSize))
   const currentPage = Math.min(page, pageCount)
@@ -899,6 +904,14 @@ export default function App() {
                 onChange={(e) => setGroupDoubles(e.target.checked)}
               />
               Group duplicates together
+            </label>
+            <label className="matched-first-toggle">
+              <input
+                type="checkbox"
+                checked={sortByPrice}
+                onChange={(e) => setSortByPrice(e.target.checked)}
+              />
+              Highest price first
             </label>
           </div>
         </div>
