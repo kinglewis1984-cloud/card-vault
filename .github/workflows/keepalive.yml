@@ -14,8 +14,13 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
+      # No -f here: these endpoints return 401 without an API key, which is
+      # expected and still proves the project is alive and reachable. Without
+      # -f, curl only exits non-zero on a real connection problem (e.g. DNS
+      # not resolving, which is what happens when a project is actually
+      # paused) - not on the expected 401.
       - name: Ping Card Vault Supabase
-        run: curl -sf https://lgdmrdeievqojbqzzbnp.supabase.co/auth/v1/health
+        run: curl -s -o /dev/null https://lgdmrdeievqojbqzzbnp.supabase.co/auth/v1/health
 
       - name: Ping Football Fan Clubz Supabase
-        run: curl -sf https://hsccirgnwfwxccwjmgjf.supabase.co/auth/v1/health
+        run: curl -s -o /dev/null https://hsccirgnwfwxccwjmgjf.supabase.co/auth/v1/health
