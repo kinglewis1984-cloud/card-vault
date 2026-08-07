@@ -1,0 +1,21 @@
+name: Keep Supabase projects alive
+
+# Supabase auto-pauses free-tier projects after 7 days with no API
+# activity. This pings each project's own auth health endpoint directly
+# (not just the website) twice a week, so the gap never gets close to 7
+# days — covers both Card Vault and Football Fan Clubz.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1,4' # Monday and Thursday, 06:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Card Vault Supabase
+        run: curl -sf https://lgdmrdeievqojbqzzbnp.supabase.co/auth/v1/health
+
+      - name: Ping Football Fan Clubz Supabase
+        run: curl -sf https://hsccirgnwfwxccwjmgjf.supabase.co/auth/v1/health
