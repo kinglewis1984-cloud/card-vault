@@ -362,6 +362,13 @@ function AddCardForm({ userId, onAdded, existingCards }) {
 
   const [selectedCard, setSelectedCard] = useState(null)
   const [selectedVariant, setSelectedVariant] = useState('')
+  const [duplicateNotice, setDuplicateNotice] = useState('')
+
+  useEffect(() => {
+    if (!duplicateNotice) return
+    const timer = setTimeout(() => setDuplicateNotice(''), 5000)
+    return () => clearTimeout(timer)
+  }, [duplicateNotice])
 
   function handleSelect(card, variant) {
     setSelectedCard(card)
@@ -377,6 +384,7 @@ function AddCardForm({ userId, onAdded, existingCards }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!name.trim()) return
+    setDuplicateNotice('')
 
     // Football has no variant/print system to distinguish two same-named
     // entries, so name alone means duplicate. Pokemon cards can legitimately
@@ -396,9 +404,9 @@ function AddCardForm({ userId, onAdded, existingCards }) {
         }
       }
 
-      const nameMatch = existingCards.some(
+      const nameMatchCount = existingCards.filter(
         (c) => c.category === 'football' && c.name.trim().toLowerCase() === name.trim().toLowerCase()
-      )
+      ).length
       const photoMatch =
         imageHash &&
         existingCards.some(
@@ -408,15 +416,17 @@ function AddCardForm({ userId, onAdded, existingCards }) {
             hammingDistance(c.image_hash, imageHash) <= PHOTO_HASH_THRESHOLD
         )
 
-      if (nameMatch || photoMatch) {
+      if (nameMatchCount > 0 || photoMatch) {
         const reason =
-          nameMatch && photoMatch
+          nameMatchCount > 0 && photoMatch
             ? 'the name and photo both match one you already have'
-            : nameMatch
+            : nameMatchCount > 0
               ? 'the name matches one you already have'
               : 'the photo looks very similar to one you already have'
-        const proceed = window.confirm(`You may already have this card — ${reason}. Add another anyway?`)
-        if (!proceed) return
+        const count = nameMatchCount > 0 ? nameMatchCount : 1
+        setDuplicateNotice(
+          `Heads up — you already have ${count} card${count > 1 ? 's' : ''} like this (${reason}). Adding another.`
+        )
       }
     } else if (category === 'pokemon') {
       // Not every add goes through Find + pick a match — plenty of adds are
@@ -425,7 +435,7 @@ function AddCardForm({ userId, onAdded, existingCards }) {
       // unmatched add still gets checked.
       const newVariant = selectedVariant || ''
       const newName = (selectedCard ? selectedCard.name : name).trim().toLowerCase()
-      const isDuplicate = existingCards.some((c) => {
+      const duplicateCount = existingCards.filter((c) => {
         if (c.category !== 'pokemon') return false
         const sameCard =
           c.pokemon_card_id && selectedCard?.id
@@ -438,13 +448,12 @@ function AddCardForm({ userId, onAdded, existingCards }) {
         // mismatch hide what's otherwise the same card.
         if (!existingVariant || !newVariant) return true
         return existingVariant === newVariant
-      })
-      if (isDuplicate) {
+      }).length
+      if (duplicateCount > 0) {
         const variant = selectedVariant ? ` (${variantLabel(selectedVariant)})` : ''
-        const proceed = window.confirm(
-          `You already have "${name.trim()}"${variant} in your collection. Add another anyway?`
+        setDuplicateNotice(
+          `Heads up — you already have ${duplicateCount} of "${name.trim()}"${variant} in your collection. Adding another.`
         )
-        if (!proceed) return
       }
     }
 
@@ -537,6 +546,7 @@ function AddCardForm({ userId, onAdded, existingCards }) {
         }}
       />
       {uploadError && <p className="hint-text error">{uploadError}</p>}
+      {duplicateNotice && <p className="hint-text notice">{duplicateNotice}</p>}
       <button type="submit" disabled={saving}>
         {saving ? 'Adding…' : 'Add Card'}
       </button>

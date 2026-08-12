@@ -18,6 +18,10 @@ body {
   color: #ff8080;
 }
 
+.hint-text.notice {
+  color: #f0c674;
+}
+
 /* Auth gate */
 
 .auth-gate {
