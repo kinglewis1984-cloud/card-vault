@@ -110,7 +110,7 @@ function AuthGate() {
       <p className="tagline">Your football &amp; Pokemon card portfolio, tracked live.</p>
       <form onSubmit={sendMagicLink}>
         {sent ? (
-          <p className="hint-text">Check your email for a sign-in link.</p>
+          <p className="hint-text">Check your email/spam for a sign-in link.</p>
         ) : (
           <>
             <input
