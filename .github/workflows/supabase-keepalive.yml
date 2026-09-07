@@ -18,4 +18,5 @@ jobs:
         run: |
           curl -sf -o /dev/null -w "Supabase ping: HTTP %{http_code}\n" \
             "https://lgdmrdeievqojbqzzbnp.supabase.co/rest/v1/" \
-            -H "apikey: sb_publishable_0PzgHSCK6kq66B2dx67Dgw_YmSEdsli"
+            -H "apikey: sb_publishable_0PzgHSCK6kq66B2dx67Dgw_YmSEdsli" \
+            -H "Authorization: Bearer sb_publishable_0PzgHSCK6kq66B2dx67Dgw_YmSEdsli"
